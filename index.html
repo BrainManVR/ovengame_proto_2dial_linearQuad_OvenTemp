@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Crust Pizza - Oven Calibration</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: #0f172a;
+            color: #e2e8f0;
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        .crt-overlay::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 20;
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+            opacity: 0.3;
+        }
+
+        .dial-container {
+            position: relative;
+            width: 160px;
+            height: 160px;
+            cursor: crosshair;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .dial-outer {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #1e293b, #0f172a);
+            border: 4px solid #334155;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5), inset 0 2px 5px rgba(255,255,255,0.1);
+            position: relative;
+            transition: border-color 0.2s;
+            touch-action: none;
+            z-index: 10;
+        }
+
+        .dial-outer:active {
+            border-color: #4af626;
+        }
+
+        .dial-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 4px;
+            height: 32px;
+            background: #f59e0b;
+            border-radius: 2px;
+            transform-origin: 50% 0%; 
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.8);
+            pointer-events: none;
+        }
+
+        .dial-knob {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 16px;
+            height: 16px;
+            background: #1e293b;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            border: 2px solid #475569;
+            pointer-events: none;
+        }
+        
+        .dial-label {
+            position: absolute;
+            font-size: 10px;
+            font-weight: bold;
+            color: #64748b;
+            width: 30px;
+            text-align: center;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        .base-btn {
+            transition: all 0.2s ease;
+            border-width: 2px;
+        }
+        
+        .base-btn:hover {
+            transform: translateX(4px);
+        }
+
+        .base-btn.active {
+            filter: brightness(1.2);
+            box-shadow: 0 0 15px currentColor;
+        }
+
+        .thermometer-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .thermometer-container {
+            width: 32px;
+            height: 280px;
+            background: #0f172a;
+            border: 3px solid #ef4444; 
+            border-radius: 16px;
+            position: relative;
+            padding: 3px;
+            display: flex;
+            flex-direction: column-reverse;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+        }
+
+        .thermometer-fill {
+            width: 100%;
+            background: linear-gradient(to top, #ef4444, #f97316);
+            border-radius: 12px;
+            transition: height 1s ease-in-out;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
+        }
+
+        .thermometer-marker {
+            position: absolute;
+            left: -5px;
+            width: 40px;
+            height: 2px;
+            background: rgba(255,255,255,0.3);
+            pointer-events: none;
+        }
+        
+        .sensor-tag {
+            background: #ef4444;
+            color: white;
+            font-size: 8px;
+            padding: 2px 4px;
+            border-radius: 2px;
+            text-transform: uppercase;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 flex flex-col items-center">
+
+    <header class="w-full max-w-6xl flex flex-col md:flex-row justify-between items-center mb-6 border-b border-slate-700 pb-4 gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-amber-400 flex items-center gap-3">
+                <span>🚀</span> Cosmic Crust Pizzaria
+            </h1>
+            <p class="text-slate-400 mt-1">Orbital Oven Calibration System v2.2</p>
+        </div>
+        
+        <div class="flex gap-4">
+            <button onclick="simulateCooling()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-[10px] font-bold text-slate-300 border border-slate-500 transition-colors">
+                REFRESH SENSOR
+            </button>
+            <div class="bg-slate-800 p-3 rounded-lg border border-slate-600 min-w-[180px]">
+                <p class="text-xs text-slate-400 uppercase tracking-wider mb-1">Target Setting</p>
+                <p id="target-base-display" class="text-emerald-400 font-bold">Xenospore Base</p>
+                <p id="target-temp-display" class="text-sm text-slate-200">180°C @ 30s</p>
+            </div>
+        </div>
+    </header>
+
+    <main class="w-full max-w-6xl bg-black p-4 md:p-6 rounded-xl border-4 border-slate-700 shadow-2xl relative">
+        
+        <div class="flex flex-col lg:flex-row gap-6">
+            <div class="hidden md:flex flex-col items-center thermometer-wrapper">
+                <div class="sensor-tag">Sensor</div>
+                <span class="text-[10px] text-slate-500 font-bold">400°C</span>
+                <div class="thermometer-container">
+                    <div id="temp-fill" class="thermometer-fill" style="height: 10%;"></div>
+                    <div class="thermometer-marker" style="bottom: 25%"></div>
+                    <div class="thermometer-marker" style="bottom: 50%"></div>
+                    <div class="thermometer-marker" style="bottom: 75%"></div>
+                </div>
+                <span class="text-[10px] text-slate-500 font-bold">0°C</span>
+                <div class="mt-2 text-center">
+                    <div class="text-[8px] text-slate-500 uppercase font-bold">Live Reading</div>
+                    <div id="live-temp-readout" class="text-white font-bold text-sm bg-red-900/50 px-2 rounded border border-red-500">20°C</div>
+                </div>
+            </div>
+
+            <div class="flex-grow bg-[#051105] rounded-lg overflow-hidden border-2 border-slate-800 relative shadow-inner crt-overlay">
+                <canvas id="ovenCanvas" width="800" height="400" class="w-full h-auto block"></canvas>
+            </div>
+
+            <div class="w-full lg:w-64 flex flex-col gap-4">
+                <h3 class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Select Dough Type</h3>
+                
+                <button onclick="setBase('xenospore')" id="btn-xeno" class="base-btn active w-full p-4 rounded-lg bg-emerald-900/30 border-emerald-500 text-emerald-400 text-left">
+                    <div class="font-bold">Xenospore</div>
+                    <div class="text-xs opacity-70">Target: 180°C</div>
+                </button>
+
+                <button onclick="setBase('plasma')" id="btn-plasma" class="base-btn w-full p-4 rounded-lg bg-blue-900/30 border-blue-500 text-blue-400 text-left">
+                    <div class="font-bold">Plasma Crust</div>
+                    <div class="text-xs opacity-70">Target: 240°C</div>
+                </button>
+
+                <button onclick="setBase('nebula')" id="btn-nebula" class="base-btn w-full p-4 rounded-lg bg-purple-900/30 border-purple-500 text-purple-400 text-left">
+                    <div class="font-bold">Nebula Dough</div>
+                    <div class="text-xs opacity-70">Target: 320°C</div>
+                </button>
+
+                <div class="mt-auto p-4 bg-slate-900 rounded-lg border border-slate-700 text-[10px] text-slate-500 leading-relaxed italic">
+                    <span class="text-red-400 font-bold">STEP 1:</span> Read the Red Sensor.<br>
+                    <span class="text-sky-400 font-bold">STEP 2:</span> Set 'Start Temp' dial to match.<br>
+                    <span class="text-amber-400 font-bold">STEP 3:</span> Adjust 'BakeBoost' to hit the green target!
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8 bg-slate-800 p-4 md:p-6 rounded-lg border border-slate-700">
+            <div class="flex flex-col sm:flex-row justify-center gap-4 mb-8 pb-6 border-b border-slate-700">
+                <button id="btn-linear" class="px-6 py-2 rounded-full font-bold transition-all bg-emerald-600 text-white shadow-[0_0_10px_rgba(16,185,129,0.5)] border-2 border-emerald-400">Linear (mx+c)</button>
+                <button id="btn-quadratic" class="px-6 py-2 rounded-full font-bold transition-all bg-slate-800 text-slate-400 hover:bg-slate-700 border-2 border-slate-700">Quadratic (ax²+c)</button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+                <div class="flex flex-col items-center gap-2">
+                    <div class="dial-container" id="dialContainerM">
+                        <div id="labels-m" class="absolute inset-0 pointer-events-none"></div>
+                        <div class="dial-outer" id="dialM">
+                            <div class="dial-indicator" id="indicatorM"></div>
+                            <div class="dial-knob"></div>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <label class="text-xs font-bold text-amber-400 uppercase tracking-widest block">BakeBoost (m/a)</label>
+                    </div>
+                </div>
+
+                <div class="flex flex-col items-center gap-4">
+                    <div class="text-center px-4 py-3 bg-slate-900 rounded-lg border border-slate-700 shadow-inner w-full">
+                        <p class="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Heating Trajectory</p>
+                        <p class="text-sm md:text-lg font-bold text-emerald-400 tracking-tight">
+                            Temp = (<span id="time-part">Time</span> × <span id="formula-m" class="text-amber-400">5.0</span>) + <span id="formula-c" class="text-sky-400">20</span>°C
+                        </p>
+                    </div>
+                    <div class="flex items-center justify-center gap-2 bg-black border-2 border-slate-600 p-4 rounded-lg shadow-inner w-full">
+                         <div class="text-center">
+                            <span id="bakeboost-display" class="text-3xl font-bold text-amber-400">5.0</span>
+                            <div class="text-[8px] text-slate-500 uppercase">Rate</div>
+                         </div>
+                        <span class="text-slate-700 text-2xl font-light">/</span>
+                        <div class="text-center">
+                            <span id="basetemp-display" class="text-3xl font-bold text-sky-400">20</span>
+                            <div class="text-[8px] text-slate-500 uppercase">Input $c$</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col items-center gap-2">
+                    <div class="dial-container" id="dialContainerC">
+                        <div id="labels-c" class="absolute inset-0 pointer-events-none"></div>
+                        <div class="dial-outer" id="dialC">
+                            <div class="dial-indicator" id="indicatorC"></div>
+                            <div class="dial-knob"></div>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <label class="text-xs font-bold text-sky-400 uppercase tracking-widest block">Start Temp Dial ($c$)</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="feedback-panel" class="mt-6 p-4 rounded-lg text-center transition-all duration-300 bg-slate-800 border-2 border-slate-700">
+            <h2 id="feedback-status" class="text-xl font-bold text-slate-300 mb-1">Sync Required</h2>
+            <p id="feedback-msg" class="text-slate-400">
+                Match the dial to the Sensor reading first!
+            </p>
+        </div>
+
+    </main>
+
+    <script>
+        const canvas = document.getElementById('ovenCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let bakeBoost = 5;       
+        let userDialTemp = 20;   
+        let actualOvenTemp = 45; 
+        let mode = 'linear';
+        let targetTemp = 180; 
+        let targetColor = '#10b981';
+        const targetTime = 30;
+        const xMax = 40; 
+        const yMax = 400; 
+
+        const dialM = document.getElementById('dialM');
+        const dialC = document.getElementById('dialC');
+        const indicatorM = document.getElementById('indicatorM');
+        const indicatorC = document.getElementById('indicatorC');
+        const boostDisp = document.getElementById('bakeboost-display');
+        const baseDisp = document.getElementById('basetemp-display');
+        const formulaM = document.getElementById('formula-m');
+        const formulaC = document.getElementById('formula-c');
+        const timePart = document.getElementById('time-part');
+        const tempFill = document.getElementById('temp-fill');
+        const tempReadout = document.getElementById('live-temp-readout');
+
+        let activeDial = null;
+
+        function simulateCooling() {
+            actualOvenTemp = 20 + Math.floor(Math.random() * 81);
+            updateUI();
+            draw();
+        }
+
+        function setBase(type) {
+            const btns = {
+                'xenospore': { id: 'btn-xeno', temp: 180, name: 'Xenospore Base', color: '#10b981' },
+                'plasma': { id: 'btn-plasma', temp: 240, name: 'Plasma Crust', color: '#3b82f6' },
+                'nebula': { id: 'btn-nebula', temp: 320, name: 'Nebula Dough', color: '#a855f7' }
+            };
+            document.querySelectorAll('.base-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(btns[type].id).classList.add('active');
+            targetTemp = btns[type].temp;
+            targetColor = btns[type].color;
+            const display = document.getElementById('target-base-display');
+            display.innerText = btns[type].name;
+            display.style.color = btns[type].color;
+            document.getElementById('target-temp-display').innerText = `${targetTemp}°C @ 30s`;
+            updateUI();
+            draw();
+        }
+
+        function createLabels(containerId, minVal, maxVal) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            const steps = 6;
+            const radius = 60; 
+            for (let i = 0; i <= steps; i++) {
+                const labelValue = minVal + (i / steps) * (maxVal - minVal);
+                const angleDeg = 90 + (i / steps) * 300;
+                const angleRad = angleDeg * (Math.PI / 180);
+                const x = 80 + Math.cos(angleRad) * radius;
+                const y = 80 + Math.sin(angleRad) * radius;
+                const label = document.createElement('div');
+                label.className = 'dial-label';
+                label.style.left = `${x}px`;
+                label.style.top = `${y}px`;
+                label.innerText = maxVal > 50 ? Math.round(labelValue) : labelValue.toFixed(1);
+                container.appendChild(label);
+            }
+        }
+
+        function init() {
+            const setupDial = (dialEl, type) => {
+                const handleDrag = (e) => {
+                    e.preventDefault();
+                    const rect = dialEl.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                    const angleRad = Math.atan2(clientY - centerY, clientX - centerX);
+                    let angleDeg = (angleRad * (180 / Math.PI) - 90 + 360) % 360;
+                    if (angleDeg > 300) angleDeg = angleDeg > 330 ? 0 : 300;
+                    
+                    if (type === 'm') {
+                        const maxVal = mode === 'linear' ? 15 : 0.5;
+                        bakeBoost = (angleDeg / 300) * maxVal;
+                    } else {
+                        userDialTemp = 20 + (angleDeg / 300) * 80;
+                    }
+                    updateUI();
+                    draw();
+                };
+
+                const start = () => { activeDial = handleDrag; };
+                dialEl.addEventListener('mousedown', start);
+                dialEl.addEventListener('touchstart', start);
+            };
+
+            setupDial(dialM, 'm');
+            setupDial(dialC, 'c');
+
+            window.addEventListener('mousemove', (e) => activeDial && activeDial(e));
+            window.addEventListener('touchmove', (e) => activeDial && activeDial(e));
+            window.addEventListener('mouseup', () => activeDial = null);
+            window.addEventListener('touchend', () => activeDial = null);
+
+            document.getElementById('btn-linear').addEventListener('click', () => setMode('linear'));
+            document.getElementById('btn-quadratic').addEventListener('click', () => setMode('quadratic'));
+            
+            createLabels('labels-m', 0, 15);
+            createLabels('labels-c', 20, 100);
+            simulateCooling();
+            updateUI();
+            draw();
+        }
+
+        function setMode(newMode) {
+            mode = newMode;
+            if (mode === 'linear') {
+                document.getElementById('btn-linear').className = "px-6 py-2 rounded-full font-bold bg-emerald-600 text-white border-2 border-emerald-400";
+                document.getElementById('btn-quadratic').className = "px-6 py-2 rounded-full font-bold bg-slate-800 text-slate-400 border-2 border-slate-700";
+                bakeBoost = 5;
+                createLabels('labels-m', 0, 15);
+            } else {
+                document.getElementById('btn-quadratic').className = "px-6 py-2 rounded-full font-bold bg-emerald-600 text-white border-2 border-emerald-400";
+                document.getElementById('btn-linear').className = "px-6 py-2 rounded-full font-bold bg-slate-800 text-slate-400 border-2 border-slate-700";
+                bakeBoost = 0.2;
+                createLabels('labels-m', 0, 0.5);
+            }
+            updateUI();
+            draw();
+        }
+
+        function updateUI() {
+            // FIX: Using float for math instead of Math.round() on bakeBoost
+            const mVal = bakeBoost.toFixed(2);
+            const cVal = Math.round(userDialTemp);
+            
+            boostDisp.innerText = mVal;
+            baseDisp.innerText = cVal;
+            formulaM.innerText = mVal;
+            formulaC.innerText = cVal;
+            timePart.innerText = mode === 'linear' ? 'Time' : 'Time²';
+
+            const mMax = mode === 'linear' ? 15 : 0.5;
+            indicatorM.style.transform = `translateX(-50%) rotate(${(bakeBoost/mMax)*300}deg)`;
+            indicatorC.style.transform = `translateX(-50%) rotate(${((userDialTemp-20)/80)*300}deg)`;
+
+            const fillPercent = Math.min(100, (actualOvenTemp / yMax) * 100);
+            tempFill.style.height = `${fillPercent}%`;
+            tempReadout.innerText = `${Math.round(actualOvenTemp)}°C`;
+
+            // Prediction logic now uses the exact bakeBoost float
+            const mFactor = parseFloat(mVal);
+            const predictedFinalTemp = mode === 'linear' 
+                ? (targetTime * mFactor) + cVal
+                : (Math.pow(targetTime, 2) * mFactor) + cVal;
+            
+            const feedbackPanel = document.getElementById('feedback-panel');
+            const feedbackStatus = document.getElementById('feedback-status');
+            const feedbackMsg = document.getElementById('feedback-msg');
+
+            const dialMatched = Math.abs(cVal - Math.round(actualOvenTemp)) < 1.1;
+            // Loosened tolerance slightly to 2 degrees to make it feel fairer but still challenging
+            const targetMatched = Math.abs(predictedFinalTemp - targetTemp) < 2.0;
+
+            if (!dialMatched) {
+                feedbackPanel.className = "mt-6 p-4 rounded-lg text-center bg-sky-900/30 border-2 border-sky-500 shadow-[0_0_10px_rgba(14,165,233,0.3)]";
+                feedbackStatus.innerText = "SENSOR MISMATCH";
+                feedbackStatus.className = "text-xl font-bold text-sky-400 mb-1";
+                feedbackMsg.innerHTML = `Set Start Temp dial ($c$) to <span class="text-white font-bold">${Math.round(actualOvenTemp)}</span> to sync with sensor.`;
+            } else if (targetMatched) {
+                feedbackPanel.className = "mt-6 p-6 rounded-lg text-center bg-emerald-900/50 border-2 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] animate-pulse";
+                feedbackStatus.innerText = "ECONOMY TARGET LOCKED!";
+                feedbackStatus.className = "font-bold text-emerald-400 text-2xl mb-1";
+                feedbackMsg.innerHTML = "Oven calibrated. <button class='ml-4 bg-emerald-500 text-black px-4 py-1 rounded-full text-sm font-bold'>START BAKE</button>";
+            } else {
+                feedbackPanel.className = "mt-6 p-4 rounded-lg text-center bg-slate-800 border-2 border-slate-700";
+                feedbackStatus.innerText = "Trajectory Adjust Needed";
+                feedbackStatus.className = "text-xl font-bold text-slate-300 mb-1";
+                const diff = predictedFinalTemp > targetTemp ? ' (Too Hot!)' : ' (Too Cold!)';
+                feedbackMsg.innerHTML = `Predicted: <span class="text-amber-400 font-bold">${Math.round(predictedFinalTemp)}°C</span> ${diff}`;
+            }
+        }
+
+        function draw() {
+            const width = canvas.width;
+            const height = canvas.height;
+            ctx.fillStyle = '#051105';
+            ctx.fillRect(0, 0, width, height);
+            
+            ctx.strokeStyle = '#1a401a';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let x = 0; x <= xMax; x += 5) {
+                const cx = (x / xMax) * width;
+                ctx.moveTo(cx, 0); ctx.lineTo(cx, height);
+            }
+            for (let y = 0; y <= yMax; y += 50) {
+                const cy = height - ((y / yMax) * height);
+                ctx.moveTo(0, cy); ctx.lineTo(width, cy);
+            }
+            ctx.stroke();
+
+            ctx.fillStyle = 'rgba(74, 246, 38, 0.6)';
+            ctx.font = '10px "JetBrains Mono"';
+            ctx.textAlign = 'center';
+            for (let x = 0; x <= xMax; x += 10) {
+                const cx = (x / xMax) * width;
+                ctx.fillText(x.toString() + 's', cx, height - 8);
+            }
+            ctx.textAlign = 'left';
+            for (let y = 0; y <= yMax; y += 50) {
+                const cy = height - ((y / yMax) * height);
+                ctx.fillText(y.toString() + '°', 5, cy - 5);
+            }
+
+            const targetX = (targetTime / xMax) * width;
+            const targetY = height - ((targetTemp / yMax) * height);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath(); ctx.moveTo(targetX, 0); ctx.lineTo(targetX, height); ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.beginPath();
+            ctx.arc(targetX, targetY, 14, 0, Math.PI * 2);
+            ctx.fillStyle = targetColor;
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = targetColor;
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            
+            const sensorX = 0;
+            const sensorY = height - ((actualOvenTemp / yMax) * height);
+            ctx.beginPath();
+            ctx.arc(sensorX, sensorY, 6, 0, Math.PI * 2);
+            ctx.fillStyle = '#ef4444';
+            ctx.fill();
+            ctx.fillStyle = '#ef4444';
+            ctx.font = '8px bold';
+            ctx.fillText('SENSOR', 10, sensorY + 3);
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#4af626';
+            ctx.lineWidth = 4;
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = '#4af626';
+            
+            // Use precise float for drawing the line
+            const mVal = bakeBoost; 
+            const cVal = Math.round(userDialTemp);
+
+            for (let x = 0; x <= xMax; x++) {
+                const y = mode === 'linear' ? (x * mVal) + cVal : (Math.pow(x, 2) * mVal) + cVal;
+                const cx = (x / xMax) * width;
+                const cy = height - ((y / yMax) * height);
+                if (x === 0) ctx.moveTo(cx, cy);
+                else ctx.lineTo(cx, cy);
+            }
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        window.onload = init;
+        window.setBase = setBase;
+        window.simulateCooling = simulateCooling;
+    </script>
+</body>
+</html>
