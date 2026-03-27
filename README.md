@@ -1,0 +1,1 @@
+# ovengame_proto_2dial_linearQuad_OvenTemp
